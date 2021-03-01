@@ -181,7 +181,7 @@ class KoGenerator(BaseGenerator):
         result = []
         n = n - 1
         need_to_swap = math.ceil(n/2/2)
-        need_to_swap2 = math.ceil(n/2/2)
+        need_to_swap2 = math.floor(n/2/2)
         need_to_delete = math.floor(n/2)
 
         # 끝에 .이 있으면 제거

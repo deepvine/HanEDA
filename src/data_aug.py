@@ -11,7 +11,7 @@ from .tokenizer import get_tokenizer
 LABEL = "label"
 TEXT = "text"
 CHATBOT = "chatbot"
-ORG = "org"
+ORG = "origin"
 POS = "wpos"
 TAG = "tagged"
 
@@ -69,7 +69,8 @@ def cal(
     n_eda = n_swdel + n_syn
     obj[EDA], obj[SWP_DEL], obj[SYN], obj[DUP] = \
         n_eda, n_swdel, n_syn, n_dp
-    return obj
+    # return obj
+    return n_eda, n_swdel, n_syn, n_dp
 
 
 def data_aug_for_textcnn(
@@ -168,50 +169,62 @@ def data_aug_for_textcnn(
 
         for key in tqdm(keys, total=len(keys)):
             no_hit_synonym = 0
-            if do_da: # run DA
-                intent_len = len(intents[key]) # 의도 utterance 개수
-                if intent_len > max_value: # 이미 utterance가 max값 보다 많으면 skip
-                    continue
-                elif intent_len <= max_value:
+            intent_len = len(intents[key]) # 의도 utterance 개수
+            if intent_len > max_value: # 이미 utterance가 max값 보다 많으면 skip
+                continue
+            need_to_gen = max_value - intent_len
+            # count_object = cal(mode, need_to_gen, alpha, beta)
+            n_eda, n_swdel, n_syn, n_dp = cal(mode, need_to_gen, alpha, beta)
+
+            if do_da and n_swdel + n_syn > 0: # run DA
+                if intent_len <= max_value:
                     augmentated = []
                     label_chatbot = []
-                    need_to_gen = max_value - intent_len
-                    count_object = cal(mode, need_to_gen, alpha, beta)
 
-                    # EDA 목표 값 안에서 각 문장마다 몇 개씩 DA를 해야하는지 계산
-                    # TODO
-                    gen_list = [0] * min(intent_len, need_to_gen)
-                    for i in range(need_to_gen):
-                        gen_list[i % len(gen_list)] += 1
+                    # EDA 목표 값 안에서 의도 그룹 안에서 
+                    # 각 문장마다 몇 개씩 DA를 해야하는지 계산
+                    swdel_list = [0] * min(intent_len, n_swdel)
+                    for i in range(n_swdel):
+                        swdel_list[i % len(swdel_list)] += 1
+
+                    syn_list = [0] * min(intent_len, n_syn)
+                    for i in range(n_syn):
+                        syn_list[i % len(syn_list)] += 1
 
                     # Data Augmentation
                     for i, intent in enumerate(list(intents[key])):
-                        # if i >= len(gen_list):
-                        #     break
+                        if i >= len(swdel_list) and i >= len(syn_list):
+                            break
 
                         row = corpus.loc[intent]
-                        # origin, text, tagged = row[ORG], row[POS], row[TAG]
-                        origin = row[TEXT]
+                        origin = row[ORG]
+                        text = row[TEXT]
                         text_wpos = row[POS]
+
+                        n1 = swdel_list[i] if i < len(swdel_list) else 0
+                        n2 = syn_list[i] if i < len(syn_list) else 0
 
                         if isHangul(origin):
                             # Korean
-                            if count_object[SWP_DEL] > 0:
-                                s = generator.swap_and_delete_word(origin, count_object[SWP_DEL])
-                            if count_object[SYN] > 0:
-                                s, no_hit_synonym = generator.synonym_insert_and_replace(text_wpos, count_object[SYN])
-                            if len(s) > 0:
-                                augmentated.extend(s)
+                            if n1 > 0:
+                                s = generator.swap_and_delete_word(origin, n1)
+                                if len(s) > 0:
+                                    augmentated.extend(s)
+                            if n2 > 0:
+                                s, no_hit_synonym = generator.synonym_insert_and_replace(text_wpos, n2)
+                                if len(s) > 0:
+                                    augmentated.extend(s)
                         else:
                             # English
                             # s = eg.swap_and_delete_word(origin, n)
                             # augmentated.extend(s)
                             pass
-                        if CHATBOT in corpus.columns:
-                            lc = [[row[LABEL], row[CHATBOT]]] * len(s)
-                        else:
-                            lc = [[row[LABEL]]] * len(s)
-                        label_chatbot.extend(lc)
+
+                    if CHATBOT in corpus.columns:
+                        lc = [[row[LABEL], row[CHATBOT]]] * len(augmentated)
+                    else:
+                        lc = [[row[LABEL]]] * len(augmentated)
+                    label_chatbot.extend(lc)
 
                     for sentence, l_c in zip(augmentated, label_chatbot):
                         sentence = DataDuplicator.one_to_many(sentence)
@@ -227,8 +240,8 @@ def data_aug_for_textcnn(
                                     l_c[0], sentence
                                 )
                             )
-                elif intent_len > count_object[EDA]:
-                    n_dp = n_dp - (intent_len - count_object[EDA])
+                elif intent_len > n_eda:
+                    n_dp = n_dp - (intent_len - n_eda)
 
             # Duplicate
             if do_dup:
@@ -239,7 +252,7 @@ def data_aug_for_textcnn(
                     s = chatbot_name + " "
                 else:
                     s = ""
-                duplicated = DataDuplicator.duplicate(sentences, count_object[DUP] + no_hit_synonym)
+                duplicated = DataDuplicator.duplicate(sentences, n_dp + no_hit_synonym)
                 for d in duplicated:
                     sentence = DataDuplicator.one_to_many(d)
                     output.writelines(
@@ -255,7 +268,7 @@ def data_aug_for_textcnn(
         intents = groups.groups
         for intent in intents:
             if len(intents[intent]) < 30:
-                print('dd')
+                print(intent, len(intents[intent]))
         group_size = groups.size()
         keys = list(groups.groups.keys())
         print()

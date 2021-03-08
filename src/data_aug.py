@@ -175,6 +175,7 @@ def data_aug_for_textcnn(
             need_to_gen = max_value - intent_len
             # count_object = cal(mode, need_to_gen, alpha, beta)
             n_eda, n_swdel, n_syn, n_dp = cal(mode, need_to_gen, alpha, beta)
+            total_no_hit_synonym = 0
 
             if do_da and n_swdel + n_syn > 0: # run DA
                 if intent_len <= max_value:
@@ -212,6 +213,7 @@ def data_aug_for_textcnn(
                                     augmentated.extend(s)
                             if n2 > 0:
                                 s, no_hit_synonym = generator.synonym_insert_and_replace(text_wpos, n2)
+                                total_no_hit_synonym += no_hit_synonym
                                 if len(s) > 0:
                                     augmentated.extend(s)
                         else:
@@ -252,7 +254,7 @@ def data_aug_for_textcnn(
                     s = chatbot_name + " "
                 else:
                     s = ""
-                duplicated = DataDuplicator.duplicate(sentences, n_dp + no_hit_synonym)
+                duplicated = DataDuplicator.duplicate(sentences, n_dp + total_no_hit_synonym)
                 for d in duplicated:
                     sentence = DataDuplicator.one_to_many(d)
                     output.writelines(

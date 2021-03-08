@@ -66,6 +66,7 @@ class KoGenerator(BaseGenerator):
             return ([], n - num_replaced)
         sentence = ' '.join(new_words)
         new_words = sentence.split(' ')
+        new_words = [word.split("/")[0] for word in new_words]
         return (new_words, n - num_replaced)
 
     def _add_synonym(self, words: list, n: int) -> tuple:
@@ -80,6 +81,7 @@ class KoGenerator(BaseGenerator):
                 count += 1
         if count == 0:
             return ([], n - count)
+        new_words = [word.split("/")[0] for word in new_words]
         return (new_words, n - count)
 
         # for _ in range(n):
@@ -243,18 +245,20 @@ class KoGenerator(BaseGenerator):
             sentence = sentence[:-1]
 
         # Insert
-        words = sentence.split()
-        augmented_sentences = []
-        added_sentence, no_hit_count = self._add_synonym(words, need_to_insert)
-        if len(added_sentence) > 0:
-            augmented_sentences.append(' '.join(added_sentence))
-        no_hit += no_hit_count
+        if need_to_insert > 0:
+            words = sentence.split()
+            augmented_sentences = []
+            added_sentence, no_hit_count = self._add_synonym(words, need_to_insert)
+            if len(added_sentence) > 0:
+                augmented_sentences.append(' '.join(added_sentence))
+            no_hit += no_hit_count
             
 
         # Replace
-        changed_sentence, no_hit_count = self._replace_synonym(words, need_to_replace)
-        if len(changed_sentence) > 0:
-            augmented_sentences.append(' '.join(changed_sentence))
-        no_hit += no_hit_count
+        if need_to_replace > 0:
+            changed_sentence, no_hit_count = self._replace_synonym(words, need_to_replace)
+            if len(changed_sentence) > 0:
+                augmented_sentences.append(' '.join(changed_sentence))
+            no_hit += no_hit_count
 
         return augmented_sentences, no_hit

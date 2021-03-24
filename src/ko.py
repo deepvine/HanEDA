@@ -4,18 +4,41 @@ from .utils import *
 import time
 import re, math
 from pathlib import Path
-from nltk.corpus import wordnet
 from .tokenizer import get_tokenizer
 
 stop_words_ko = ['', 'ㄴ', './SF', '.', '에서', '은', 'ㄹ', '이', '하', '어', '을', '를'
 			'는', '가', '에', '있', '어야', '데', '고', 'ㄹ게', 'ㄹ까', '들',
 			'야', '었', '는데', 'ㄴ다', '세요', '수', '주', '어요', '요', '을까']
 
-JOSA = ['JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JX', 'JC']
+JOSA = ['JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JX', 'JC'] # mecab 기준
 
 class KoGenerator(BaseGenerator):
-    """
-    Processing data augmentation for Korean data
+    """ 한국어 Data Augmentation Class
+
+    한국어의 경우 DA는 크게 2가지로 진행됩니다.
+    1) self.swap_and_delete_word : 토큰 단위로 단어의 위치를 서로 바꾸거나, 단어를 삭제합니다
+    2) self.synonym_insert_and_replace: 유사어를 삽입하거나 교체합니다.
+
+
+    DA mode에 따라 위의 2가지 알고리즘을 조합하여 사용합니다.
+    1) DATA AUGMENTATION MODE (MODE == 1)
+        "필요한 개수" 만큼 EDA를 실행합니다.
+        상세한 알고리즘 실행은 KoGenerator.swap_and_delete_word()와
+        KoGenerator.synonym_insert_and_replace()에서 실행됩니다.
+    2) MIX MODE - ONLY SWAP AND DELETE  (MODE == 2)
+        70:30 비율로 복제와 DA, 둘 다 실행합니다.
+        예를들어, 20개의 utterance가 생성이 필요하면 비율에따라 복제:DA = 14:6 이므로
+        14개를 복제하고 6개를 DA 합니다.
+        다만, DA의 경우, KoGenerator.swap_and_delete_word()만 실행합니다.
+    3) MIX MODE (MODE == 3)
+        70:30 비율로 복제와 DA, 둘 다 실행합니다.
+        예를들어, 20개의 utterance가 생성이 필요하면 비율에따라 복제:DA = 14:6 이므로
+        14개를 복제하고 6개를 DA 합니다.
+        다만, DA의 경우, KoGenerator.synonym_insert_and_replace()만 실행합니다.
+    4) MIX MODE (MODE == 4)
+        70:30 비율로 복제와 DA, 둘 다 실행합니다.
+        예를들어, 20개의 utterance가 생성이 필요하면 비율에따라 복제:DA = 14:6 이므로
+        14개를 복제하고 6개를 DA 합니다.
     
     """
     def __init__(
@@ -26,7 +49,8 @@ class KoGenerator(BaseGenerator):
         """Instantiating Generator class
 
         Args:
-            data_aug_method
+            - synonym_file(str): 유사어 사전 파일 경로
+            - tokenizer(str): 토크나이저 네임
         """
         super(KoGenerator, self).__init__(
             synonym_file,
@@ -41,10 +65,6 @@ class KoGenerator(BaseGenerator):
             syns = row.iloc[0]['synonym']
             for syn in syns.split():
                 synonyms.append(syn)
-            # syns = syns.split()
-            # min_value = min(len(syns), n)
-            # for i in range(min_value):
-            #     synonyms.append(syns[i])
         return synonyms
 
     def _replace_synonym(self, words: list, n: int) -> tuple:
@@ -83,16 +103,6 @@ class KoGenerator(BaseGenerator):
             return ([], n - count)
         new_words = [word.split("/")[0] for word in new_words]
         return (new_words, n - count)
-
-        # for _ in range(n):
-        #     synonyms = None
-        #     for nw in new_words:
-        #         synonyms = self._get_synonyms(nw)
-        #         if len(synonyms) > 1:
-        #             break
-        #     if len(synonyms) > 0:
-        #         new_words.insert(0, synonyms[0])
-        # return new_words
 
     def _swap_word(self, words, n):
         if len(words) == 1 or\
@@ -141,10 +151,10 @@ class KoGenerator(BaseGenerator):
 
         return result
 
-    def _delete_josa(self, words):
+    def _delete_josa(self, words: list):
         """
         Args:
-            words: all words have to be tagged
+            - words(list): 단어들은 반드시 POS정보를 같이 와야합니다. 예) 가방/NNG
         """
         if len(words) == 1:
             return words[0][0], words[0]

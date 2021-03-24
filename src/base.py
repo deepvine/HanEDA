@@ -19,7 +19,6 @@ class BaseGenerator(object):
     def __init__(
             self,
             synonym_data_path: str = None,
-            alpha: float = 0.2,
             num_aug: int = 4):
         """Instantiating Generator class
 
@@ -27,9 +26,7 @@ class BaseGenerator(object):
             data_aug_method
         """
         super().__init__()
-        self.alpha = alpha
         self.num_aug = num_aug
-        self.alpha = alpha
 
         if synonym_data_path:
             self._synonym_df = get_tsv_file(synonym_data_path)

@@ -1,6 +1,8 @@
 # HanEDA : Hangul Easy Data Augmentation
 </h1>
 
+한국어를 위한 EDA
+
 Base paper: [EDA: Easy Data Augmentation techniques for boosting performance on text classification tasks.](https://arxiv.org/abs/1901.11196)
 
   
